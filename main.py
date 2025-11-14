@@ -9,7 +9,6 @@ import textwrap
 from PIL import Image
 import os
 
-
 def load_icons(df: pd.DataFrame, icon_folder: str, label_col: str) -> dict:
     """
     Load and resize icons (e.g., flags or logos) for each unique label in the dataset.
@@ -69,7 +68,9 @@ def add_icons(ax: plt.Axes, icons: dict) -> None:
             img = icons[label].convert("RGBA")
             fig = ax.get_figure()
             dpi_scale = fig.dpi / 100.0
-            imagebox = OffsetImage(img, zoom=0.07 / dpi_scale)
+            # for streamlit use: zoom = 0.07
+            # if "__name__" == "__main__" : use zoom = 0.7
+            imagebox = OffsetImage(img, zoom=0.7 / dpi_scale)      
             ab = AnnotationBbox(
                 imagebox,
                 xy=(0, y_pos),
@@ -83,12 +84,65 @@ def add_icons(ax: plt.Axes, icons: dict) -> None:
             ax.add_artist(ab)
 
 
+def setup_dt(ax: plt.Axes, dt: int) -> None:
+    """
+    Display the current frame label (e.g., year or date) on the chart.
+
+    The label is drawn as text within the plot area, typically in the 
+    bottom-right corner.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        The plot axes.
+    dt : int
+        Current frame identifier (e.g., year or time index).
+
+    Returns
+    -------
+    None
+    """
+    ax.text(0.9, 0.05, str(dt), transform=ax.transAxes,
+            ha='center', color="#0B0101", fontsize=15)
+
+
+def setup_watermark(ax: plt.Axes, watermark: str = None) -> None:
+    """
+    Adds a subtle, aesthetic watermark to a Matplotlib Axes object.
+
+    This function places a semi-transparent text watermark at the center of the
+    plot area.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The Axes object where the watermark will be drawn.
+    watermark : str, optional
+        The text to display as a watermark. If None or an empty string,
+        no watermark is added.
+
+    """
+    if watermark:
+        ax.text(
+            0.5, 0.5, watermark,
+            transform=ax.transAxes,
+            fontsize=9,
+            color=(0, 0, 0, 0.15),
+            ha='center',
+            va='center',
+            rotation=30,
+            alpha=0.35,
+            fontweight='light',
+            zorder=10
+        )
+
 def draw_frame(
     ax: plt.Axes, 
     df: pd.DataFrame, 
     title: str, 
     frame: int, 
-    icons: dict, 
+    icons: dict,
+    watermark: str|None = None,
     n_largest: int = 10, 
     colors: list | None = None, 
     palette: str | None = 'viridis'
@@ -111,6 +165,8 @@ def draw_frame(
         Current frame identifier (e.g., year or time period).
     icons : dict
         Mapping of label names → PIL.Image.Image objects for use in the chart.
+    watermark : str, optional
+        Watermark to be placed on the figure
     n_largest : int, optional
         Number of top items to display per frame (default is 10).
     colors : list, optional
@@ -125,6 +181,7 @@ def draw_frame(
     ax.clear()
     setup_plotstyle(ax)
     setup_dt(ax, frame)
+    setup_watermark(ax, watermark)
     frame_data = df[df['dt'] == frame]
     top_items = frame_data.nlargest(n_largest, 'x')
 
@@ -198,33 +255,12 @@ def wrap_labels(ax: plt.Axes, width: int | float = 12) -> None:
     ax.set_yticklabels(wrapped_labels)
 
 
-def setup_dt(ax: plt.Axes, dt: int) -> None:
-    """
-    Display the current frame label (e.g., year or date) on the chart.
-
-    The label is drawn as text within the plot area, typically in the 
-    bottom-right corner.
-
-    Parameters
-    ----------
-    ax : plt.Axes
-        The plot axes.
-    dt : int
-        Current frame identifier (e.g., year or time index).
-
-    Returns
-    -------
-    None
-    """
-    ax.text(0.9, 0.05, str(dt), transform=ax.transAxes,
-            ha='center', color="#0B0101", fontsize=15)
-
-
 def save_animation(
     df: pd.DataFrame,
     frames: list | np.ndarray | pd.Series,
     icons: dict,
     file_format: str = 'mp4',
+    watermark: str|None = None,
     output_path: str = os.path.dirname(os.path.abspath(__file__)),
     title: str = None,
     width: int | float = 12,
@@ -249,6 +285,8 @@ def save_animation(
         Mapping of labels → PIL.Image.Image objects for icons.
     file_format : str, optional
         File format for output ('mp4' or 'gif'). Default is 'mp4'.
+    watermark : str, optional
+        Watermark to be placed on the figure.
     output_path : str, optional
         Directory where the file will be saved (default: current directory).
     title : str, optional
@@ -274,7 +312,7 @@ def save_animation(
         frame_data = df[df['dt'] == frame]
         top_items = frame_data.nlargest(n_largest, 'x')
         colors = top_items['color'].tolist() if 'color' in top_items.columns else None
-        draw_frame(ax, df, f"{title}", frame, icons, n_largest=n_largest, colors=colors, palette=palette)
+        draw_frame(ax, df, f"{title}", frame, icons, watermark, n_largest=n_largest, colors=colors, palette=palette)
         return []
 
     anim = FuncAnimation(fig, animate, frames=frames, interval=200)
@@ -287,6 +325,7 @@ def show_animation(
     df: pd.DataFrame,
     frames: list | np.ndarray | pd.Series,
     icons: dict,
+    watermark: str|None = None,
     title: str = None,
     width: int | float = 12,
     height: int | float = 6,
@@ -305,6 +344,8 @@ def show_animation(
         Sequence of frame identifiers (e.g., years).
     icons : dict
         Mapping of label → PIL.Image.Image for icons.
+    watermark : str, optional
+        Watermark to be placed on the figure
     title : str, optional
         Plot title for each animation frame.
     width : int or float, optional
@@ -328,7 +369,7 @@ def show_animation(
         frame_data = df[df['dt'] == frame]
         top_items = frame_data.nlargest(n_largest, 'x')
         colors = top_items['color'].tolist() if 'color' in top_items.columns else None
-        draw_frame(ax, df, f"{title}", frame, icons, n_largest=n_largest, colors=colors, palette=palette)
+        draw_frame(ax, df, f"{title}", frame, icons, watermark, n_largest=n_largest, colors=colors, palette=palette)
         return []
 
     anim = FuncAnimation(fig, animate, frames=frames, interval=fps)
@@ -339,6 +380,7 @@ if __name__ == "__main__":
     data_path = './data/clean-formatted-data.csv'
     icons_path = './icons'
     file_format = 'gif'
+    watermark = 'Example_Watermark'
     output = os.path.dirname(os.path.abspath(__file__))
     title = "Top 10 Populations in the World Prediction"
     fps = 12
@@ -351,7 +393,7 @@ if __name__ == "__main__":
     frames = df['dt'].unique().tolist()
     icons = load_icons(df, icons_path, label_col='label')
 
-    p = Process(target=save_animation, args=(df, frames, icons, file_format, output, title, width, height, fps))
+    p = Process(target=save_animation, args=(df, frames, icons, file_format, watermark, output, title, width, height, fps))
     p.start()
-    show_animation(df, frames, icons, title=title, width=width, height=height, fps=fps)
+    show_animation(df, frames, icons, watermark, title=title, width=width, height=height, fps=fps)
     p.join()

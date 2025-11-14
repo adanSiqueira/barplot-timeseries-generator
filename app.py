@@ -35,6 +35,7 @@ st.header("📁 1 - Upload Your Data")
 
 # Chart Title
 title = st.text_input("📝 Chart Title", placeholder="e.g., Global Population Growth (1960–2020)")
+watermark = st.text_input("Watermark", placeholder="write a watermark to the chart (optional)")
 
 # CSV Upload
 uploaded_csv = st.file_uploader("📄 Upload your CSV file", type=["csv"])
@@ -124,6 +125,7 @@ if st.button("Generate & Download Animation"):
                 frames=frames,
                 icons=icons,
                 file_format=file_format,
+                watermark=watermark,
                 output_path=output_path,
                 title=title,
                 width=width,
